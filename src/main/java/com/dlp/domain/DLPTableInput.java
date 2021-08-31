@@ -14,4 +14,12 @@ public class DLPTableInput {
         this.header = header;
         this.rows = rows;
     }
+
+    public List<FieldId> getHeader() {
+        return header;
+    }
+
+    public List<Table.Row> getRows() {
+        return rows;
+    }
 }
