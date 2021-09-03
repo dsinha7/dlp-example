@@ -1,0 +1,5 @@
+tablename,columnname,riskcategory,datadomain,sensitivity,shouldencrypt
+customer_vin,first_name,category0,first_name,NoPII,TRUE
+customer_vin,last_name,category1,first_name,PII,TRUE
+customer_vin,vin,category2,vin,SPII,FALSE
+customer_vin,ssn,category2,ssn,SPII,FALSE

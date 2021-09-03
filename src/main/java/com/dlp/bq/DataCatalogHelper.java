@@ -1,11 +1,12 @@
 package com.dlp.bq;
 
+import com.dlp.domain.ColumnTag;
 import com.google.cloud.datacatalog.v1.*;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class DataCatalogHelper {
@@ -26,44 +27,67 @@ public class DataCatalogHelper {
         }
         return tagTemplate;
     }
+    public static void updateColumnTagTemplate(String projectId, String templateId, String bqDataSetId, String tagRegion, String csvFilePath) throws Exception {
 
-    private static void populateColumnTempate(String projectId, String templateId, String qualifiedTablePath, Map<String, Map<String,Object>> columnTagValue) throws Exception{
+        //read the CSV
+        CSVHelper csv = new CSVHelper();
+        csv.readCsv(csvFilePath);
+        List<ColumnTag> rows = csv.getRows();
+        //TODO :: group the CSV data by table name in to a Map. Assuming only one table for now in case Ford wants to upload multiple tables in same CSV.
+        String tableName = rows.get(0).getTableName();
+        String qualifiedTablePath = String.format(
+                "//bigquery.googleapis.com/projects/%s/datasets/%s/tables/%s",
+                projectId, bqDataSetId, tableName);
+
+        System.out.println("Table to tag [" + qualifiedTablePath + "]");
+
 
         try (DataCatalogClient dataCatalogClient = DataCatalogClient.create()) {
 
+            TagTemplate tagTemplate = getTagTemplate(dataCatalogClient, templateId, tagRegion, projectId);
 
-
-            TagTemplate tagTemplate = getTagTemplate(dataCatalogClient, templateId, "us-central1", projectId);
-
-            if(tagTemplate == null ){
+            if (tagTemplate == null) {
                 throw new Exception("Could not get template ");
             }
 
+            for (ColumnTag tag : rows) {
 
-
-            //refactor this code to make generic
-            for( String columnName : columnTagValue.keySet()){
-                Map<String,Object> innerMap = columnTagValue.get(columnName);
                 Tag.Builder tagBuilder =
                         Tag.newBuilder()
                                 .setTemplate(tagTemplate.getName());
 
-                for(String attributeName: innerMap.keySet()){
-                    Object value = innerMap.get(attributeName);
-                    if("INFO_TYPE".equalsIgnoreCase(attributeName)){
-                        //TagField infoType = TagField.newBuilder().setStringValue((String)value).build();
-                        TagField infoType = TagField.newBuilder().setEnumValue(
-                                TagField.EnumValue.newBuilder().setDisplayName((String)value).build()).build();
-                        tagBuilder.putFields("info_type", infoType);
-                    } else if ("IS_PII".equalsIgnoreCase(attributeName)) {
+                for(String infoType : csv.getHeaders()){
+                    //tablename,columnname,riskCategory,DataDomain,Sensitivity,should_encrypt
+                    if( infoType.toLowerCase().equalsIgnoreCase("riskcategory") ){
 
-                        TagField isPii = TagField.newBuilder().setBoolValue((Boolean)value).build();
-                        tagBuilder.putFields("is_pii", isPii);
-                    }else{
-                        System.out.println(" Attribute " + attributeName + " not supported for the tag template "  + templateId);
+                        TagField tagField = TagField.newBuilder().setEnumValue(
+                                TagField.EnumValue.newBuilder().setDisplayName(tag.getRiskCategory()).build()).build();
+                        tagBuilder.putFields("riskcategory", tagField);
+
+                    }else if(infoType.toLowerCase().equalsIgnoreCase("datadomain")){
+                        TagField tagField = TagField.newBuilder().setEnumValue(
+                                TagField.EnumValue.newBuilder().setDisplayName(tag.getDataDomain()).build()).build();
+                        tagBuilder.putFields("datadomain", tagField);
+
+                    }
+                    else if(infoType.toLowerCase().equalsIgnoreCase("sensitivity")){
+                        TagField tagField = TagField.newBuilder().setEnumValue(
+                                TagField.EnumValue.newBuilder().setDisplayName(tag.getSensitivity()).build()).build();
+                        tagBuilder.putFields("sensitivity", tagField);
+
+                    }else if (infoType.toLowerCase().equalsIgnoreCase("shouldencrypt")) {
+                        TagField tagField = TagField.newBuilder().setBoolValue(tag.getShouldEncrypt()).build();
+                        tagBuilder.putFields("shouldencrypt", tagField);
+                    }else if(infoType.toLowerCase().equalsIgnoreCase("tablename") ||
+                            infoType.toLowerCase().equalsIgnoreCase("columnname") ){
+                        //ignore since they are not used as tag attribute
+                    }
+                    else {
+                        System.out.println(" Attribute " + infoType + " not supported for the tag template " + templateId);
                     }
 
                 }
+                //TODO: Handle failure due to tag already attached
                 LookupEntryRequest lookupEntryRequest =
                         LookupEntryRequest.newBuilder().setLinkedResource(qualifiedTablePath).build();
                 Entry tableEntry = dataCatalogClient.lookupEntry(lookupEntryRequest);
@@ -71,55 +95,18 @@ public class DataCatalogHelper {
                 CreateTagRequest createTagRequest =
                         CreateTagRequest.newBuilder().setParent(tableEntry.getName())
                                 //set the column name to make it column level tag.
-                                .setTag(tagBuilder.setColumn(columnName).build()).build();
-
+                                .setTag(tagBuilder.setColumn(tag.getColumnName()).build()).build();
                 dataCatalogClient.createTag(createTagRequest);
-            }
-            //
 
+            }// for each column
 
+            System.out.println(String.format("Successfully update table [%s] columns with tag template [%s] !!", tableName, templateId));
 
         } catch (IOException e) {
+            //TODO:: handle error
             e.printStackTrace();
         }
-
-    }
-    private static Map<String, Object> createInnerMap(String infoType, Boolean isPii){
-
-        Map<String, Object> innerMap = new HashMap<>();
-        innerMap.put("INFO_TYPE", infoType);
-        innerMap.put("IS_PII", isPii);
-        return innerMap;
     }
 
-    public static void main(String[] args) throws Exception{
-        String projectId = "data-catalog-examples-321520";
-        String dataSetId = "example_dataset";
-        String tableName = "customer_vin";
-        String templateName = "fordexampletagtemplate";
 
-        String tablePath =
-                String.format(
-                        "//bigquery.googleapis.com/projects/%s/datasets/%s/tables/%s",
-                        projectId, dataSetId, tableName);
-
-        //create a list
-        /*
-            credit_card_no
-                 infoTYpe=ssn, is_pii=true
-            VIN
-                infoTYpe=VIN, is_pii=False
-         */
-
-        Map<String,Map<String,Object>> columnMap = new HashMap<>();
-        //credit_card_no, info_type credit_card_no, is_pii fal
-        columnMap.put("credit_card_no", createInnerMap("SSN", Boolean.TRUE));
-        columnMap.put("VIN", createInnerMap("VIN", Boolean.FALSE));
-
-
-        populateColumnTempate(projectId, templateName,tablePath, columnMap);
-
-
-
-    }
 }

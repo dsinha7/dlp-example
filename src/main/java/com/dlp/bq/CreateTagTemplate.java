@@ -81,7 +81,7 @@ public class CreateTagTemplate {
 
             // Create the Tag Template.
             tagTemplate = dataCatalogClient.createTagTemplate(createTagTemplateRequest);
-            System.out.println(String.format("Template created with name: %s", tagTemplate.getName()));
+                System.out.println(String.format("Template created with name: %s", tagTemplate.getName()));
 
 
         }catch (Exception e) {

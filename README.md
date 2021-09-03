@@ -126,3 +126,14 @@ create a service account "dlp_catalog_bq_admin" with BQAdmin, DLPAdmin, DataCate
 
 java -cp target/dlp-example-1.0-SNAPSHOT-jar-with-dependencies.jar com.dlp.bq.DataCatalogHelper
 java -cp target/dlp-example-1.0-SNAPSHOT-jar-with-dependencies.jar com.dlp.bq.CreateTagTemplate
+
+
+#### Upload Tag Template CLI
+
+java -cp target/dlp-example-1.0-SNAPSHOT-jar-with-dependencies.jar com.dlp.cli.UploadTags \
+-projectId data-catalog-examples-321520 \
+-tagRegion us-central1 \
+-bqDatasetName example_dataset \
+-tagTemplateName fordexampletagtemplate \
+-inputCSVPath sample_tag_data.csv
+
