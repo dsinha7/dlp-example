@@ -35,6 +35,7 @@ public class DataCatalogHelper {
         List<ColumnTag> rows = csv.getRows();
         //TODO :: group the CSV data by table name in to a Map. Assuming only one table for now in case Ford wants to upload multiple tables in same CSV.
         String tableName = rows.get(0).getTableName();
+
         String qualifiedTablePath = String.format(
                 "//bigquery.googleapis.com/projects/%s/datasets/%s/tables/%s",
                 projectId, bqDataSetId, tableName);

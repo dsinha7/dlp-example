@@ -29,7 +29,9 @@ public class RunInspection {
 
 
     }
-
+    /*
+        this is a alternate way to inspect the data by reading the BQ data using simba jdbc data.
+     */
     private static void inspectInlineAPI(RunDLPJobArg parseArgs) throws IOException {
         DLPTableInput bqTableData = DLPHelper.bqToDLPTable(parseArgs.getDbName(),
                 parseArgs.getTableName(),
